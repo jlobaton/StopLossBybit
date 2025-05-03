@@ -2,11 +2,14 @@ import config
 import time
 from pybit.unified_trading import HTTP
 from decimal import Decimal, ROUND_DOWN, ROUND_FLOOR
+import os
+
 
 symbol = ''  # Puedes ajustar el símbolo según tus necesidades
 stop_loss = 0  # Valor en USDT
 estado = False
 capital = 0
+valor = ''
 
 session = HTTP(
     testnet=False,
@@ -14,6 +17,13 @@ session = HTTP(
     api_secret=config.api_secret,
 )
 
+def clear_screen():
+    # Para Windows
+    if os.name == 'nt':
+        os.system('cls')
+    # Para Unix/Linux/MacOS
+    else:
+        os.system('clear')
 
 def qty_step(symbol, price):
     step = session.get_instruments_info(category="linear", symbol=symbol)
@@ -46,6 +56,7 @@ def establecer_stop_loss(symbol, price):
 
 
 # Lógica del bot (ejemplo simple: compra y venta cada 60 segundos)
+clear_screen()
 while True:
     try:
         if estado:
@@ -54,12 +65,18 @@ while True:
             if float(posiciones['result']['list'][0]['size']) != 0:
                 precio_de_entrada = float(posiciones['result']['list'][0]['avgPrice'])
                 USDT = float(posiciones['result']['list'][0]['positionValue'])
-                porcentaje = (stop_loss * 100) / USDT
-                aumento = precio_de_entrada * (porcentaje / 100)
+
+                if opcion == '2':
+                    porcentaje = (stop_loss * 100) / USDT
+                    aumento = precio_de_entrada * (porcentaje / 100)
+                else:
+                    aumento = precio_de_entrada * (stop_loss / 100)  # Ej: 5% → precio * 0.05
+
                 if posiciones['result']['list'][0]['side'] == 'Buy':
                     stop_price = precio_de_entrada - aumento
                 else:
                     stop_price = precio_de_entrada + aumento
+
                 if stop_price < 0:
                     print('TU STOP LOSS NO ES POSIBLE, SE ENCUENTRA POR DEBAJO DE CERO')
                 else:
@@ -78,11 +95,22 @@ while True:
             if tick != '':
                 tick = tick + 'USDT'
                 symbol = tick
-                stop = float(input('INGRESE EL VALOR MAXIMO EN USDT QUE DESEA PERDER: '))
+                #opcion =  str(input('¿COMO DESEA USAR EL STOPLOSS? ¿EN % O VALOR EN USDT? ')).strip().upper()
+                opcion = input('¿COMO DESEA USAR EL STOPLOSS? (1 para %, 2 para VALOR): ').strip()
+                #print(opcion)
+                if opcion == '2':
+                    stop = float(input('INGRESE EL VALOR MAXIMO EN USDT QUE DESEA PERDER: '))
+                elif opcion == '1':
+                    stop = float(input('INGRESE EL % MAXIMO QUE DESEA PERDER (sin apalancamiento): '))
+                else:
+                    print('EL DATO INGRESADO NO ES VALIDO')
+
                 if stop != '':
                     stop_loss = stop
                     # Posiciones Abiertas
                     posiciones = session.get_positions(category="linear", symbol=symbol)
+                    #print(posiciones)
+                    #print(posiciones['result']['list'][0])
                     if float(posiciones['result']['list'][0]['size']) != 0:
                         print('POSICION ABIERTA EN ' + symbol)
                         estado = True
